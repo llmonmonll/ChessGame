@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ブラウザで Stockfish と対局できる本格チェス。棋譜・持ち時間設定に対応。">
+  <title>Grandmaster Chess — 本格ブラウザ対局</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/styles.css?v=10">
+</head>
+<body>
+  <a class="skip-link" href="#board">盤面へスキップ</a>
+  <a class="skip-link skip-link--2" href="#settings-panel">設定・CPU の強さへ</a>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">♔</span>
+        <div>
+          <h1 class="brand-title">Grandmaster Chess</h1>
+          <p class="brand-sub">Stockfish 搭載 · 本格ルール · 棋譜出力</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <span id="engineBadge" class="badge">エンジン: 準備中…</span>
+        <span id="materialDiff" class="material-diff" aria-live="polite"></span>
+      </div>
+    </header>
+
+    <main class="app">
+      <section class="left left--board-main" aria-labelledby="board-heading">
+        <h2 id="board-heading" class="visually-hidden">チェス盤</h2>
+        <div class="board-area">
+          <div class="board-frame-wrap">
+            <div id="lobbyOverlay" class="lobby-overlay" role="status">
+              <div class="lobby-overlay__inner">
+                <strong class="lobby-overlay__title">対局は未開始です</strong>
+                <span class="lobby-overlay__text">右の「対局開始」を押すまで手番は進みません（盤は初期配置のプレビュー）。</span>
+              </div>
+            </div>
+            <div class="board-frame">
+              <div class="board-corner" aria-hidden="true"></div>
+              <div class="board-files" aria-hidden="true">
+                <span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span>
+              </div>
+              <div class="board-ranks" aria-hidden="true">
+                <span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span>
+              </div>
+              <div id="board" class="board" aria-label="チェス盤"></div>
+            </div>
+            <div id="checkToast" class="check-toast" role="alert" aria-live="assertive" hidden>
+              <span class="check-toast__spark" aria-hidden="true"></span>
+              <div class="check-toast__inner">
+                <span class="check-toast__icon" aria-hidden="true">♔</span>
+                <div class="check-toast__body">
+                  <strong class="check-toast__title">王手！</strong>
+                  <span id="checkToastHint" class="check-toast__hint"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="turnBanner" class="turn-banner turn-banner--idle" role="status" aria-live="polite">
+          <span id="turnBadge" class="turn-banner__badge">待機</span>
+          <div class="turn-banner__body">
+            <span id="turnTitle" class="turn-banner__title">対局開始前</span>
+            <span id="turnHint" class="turn-banner__hint">「対局開始」で白から始まります</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="right">
+        <div id="status" class="status" role="status"></div>
+
+        <div id="settings-panel" class="panel panel--settings">
+          <h3 class="panel-title">設定</h3>
+          <p class="panel-lead">対局前に CPU の強さを調整できます（応答は常に短めです）。</p>
+          <div class="field-grid">
+            <label class="field field--range field--primary">
+              <span class="field-label">CPU の強さ（レベル 0〜20）</span>
+              <div class="range-row">
+                <input type="range" id="engineDifficulty" min="0" max="20" step="1" value="12" aria-describedby="engineDifficultyHint">
+                <span id="engineDifficultyLabel" class="range-label">Lv 12（ふつう）</span>
+              </div>
+              <span id="engineDifficultyHint" class="field-hint">強さは主にこのレベル（Stockfish は Skill Level、オフ時は探索の深さ・ノード）。思考時間もレベルに連動し、持ち時間は軽いブレにとどめます。</span>
+            </label>
+            <label class="field">
+              <span class="field-label">持ち時間（各側）</span>
+              <select id="timePreset" class="field-input">
+                <option value="180">3 分</option>
+                <option value="300" selected>5 分</option>
+                <option value="600">10 分</option>
+                <option value="900">15 分</option>
+                <option value="0">無制限</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">フィッシャー加算（1手ごと）</span>
+              <select id="incrementPreset" class="field-input">
+                <option value="0" selected>0 秒</option>
+                <option value="1">1 秒</option>
+                <option value="2">2 秒</option>
+                <option value="3">3 秒</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">対局時計</h3>
+          <div class="clocks" aria-label="対局時計">
+            <div id="clockRowWhite" class="clock-row clock-row--white" data-side="white">
+              <span class="clock-label">あなた（白）</span>
+              <span id="clockWhite" class="clock-value">05:00</span>
+            </div>
+            <div id="clockRowBlack" class="clock-row clock-row--black" data-side="black">
+              <span class="clock-label">CPU（黒）</span>
+              <span id="clockBlack" class="clock-value">05:00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="newGameBtn" type="button">対局開始</button>
+          <button id="undoBtn" type="button" class="secondary" disabled title="あなた（白）の直前の手を取り消します。CPU が既に応じている場合は、その手もまとめて戻します" aria-label="自分の直前の手を取り消す">一手戻す</button>
+          <button id="resetGameBtn" type="button" class="secondary" disabled title="現在の対局をやめて、初期配置から始めます" aria-label="対局をリセットして最初からやり直す">最初から</button>
+          <button id="copyPgnBtn" type="button" class="secondary">棋譜をコピー</button>
+          <button id="exitBtn" type="button" class="danger">終了</button>
+        </div>
+
+        <div class="panel panel--log">
+          <h3 class="panel-title">棋譜</h3>
+          <div id="log" class="log" tabindex="0">まだ指されていません。</div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <p>合法手のみ入力 · キャスリング · アンパッサン · プロモーション対応 · 50 手ルール · 時間切れ（詰み可否を判定）</p>
+    </footer>
+  </div>
+
+  <div id="promoModal" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="promoModalTitle">
+    <div class="modal__backdrop" data-close="1"></div>
+    <div class="modal__card">
+      <h2 id="promoModalTitle" class="modal__title">昇格する駒</h2>
+      <p class="modal__hint">プロモーション先を選んでください。</p>
+      <div class="promo-grid">
+        <button type="button" class="promo-btn" data-promo="q" title="クイーン">♕ Q</button>
+        <button type="button" class="promo-btn" data-promo="r" title="ルーク">♖ R</button>
+        <button type="button" class="promo-btn" data-promo="b" title="ビショップ">♗ B</button>
+        <button type="button" class="promo-btn" data-promo="n" title="ナイト">♘ N</button>
+      </div>
+      <button type="button" id="promoCancel" class="modal__cancel">キャンセル</button>
+    </div>
+  </div>
+
+  <script src="./assets/engine/chess-engine-bridge.js?v=6"></script>
+  <script src="./assets/cpu-fallback.js?v=5"></script>
+  <script src="./assets/chess.js?v=15"></script>
+</body>
+</html>
